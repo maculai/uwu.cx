@@ -328,10 +328,10 @@
   const audio=document.getElementById('radio');
   audio.volume=0.8;
 
-  // ── vinyl — dark record, rainbow underglow on hover/play ──
+  // ── vinyl — dark record, rotating rainbow ring + underglow ──
   const vc=document.getElementById('vinyl-canvas');
   const vx=vc.getContext('2d');
-  const VSZ=128, VCX=64, VCY=64, VR=52;
+  const VSZ=128, VCX=64, VCY=64, VR=54;
   let vHue=0, hovV=false, glowAlpha=0;
   let audioCtx, analyser, srcNode, dataArr;
 
@@ -351,7 +351,7 @@
   function getPulse(){
     if(!analyser)return 1;
     analyser.getByteFrequencyData(dataArr);
-    return 1+(dataArr.reduce((a,b)=>a+b,0)/dataArr.length/255)*0.5;
+    return 1+(dataArr.reduce((a,b)=>a+b,0)/dataArr.length/255)*0.4;
   }
 
   function drawVinyl(){
@@ -359,47 +359,60 @@
     const active = playing || hovV;
     const pulse = playing ? getPulse() : 1;
     const targetAlpha = active ? 1 : 0;
-    glowAlpha += (targetAlpha - glowAlpha) * 0.06;
-    if(active) vHue += playing ? 1.5 : 1.0;
+    glowAlpha += (targetAlpha - glowAlpha) * 0.05;
+    if(active) vHue += playing ? 1.2 : 0.8;
 
-    // ── UNDERGLOW — drawn first, outside clip ──
+    // ── UNDERGLOW — outside clip ──
     if(glowAlpha > 0.01){
-      const glowR = VR * 1.6 * pulse;
-      const segs = 60;
+      const segs=48;
       for(let s=0;s<segs;s++){
-        const angle = (s/segs)*Math.PI*2;
-        const hue = (s/segs)*360 + vHue;
-        // glow point sits at the rim, bleeds outward
-        const gx = VCX + Math.cos(angle)*VR*0.95;
-        const gy = VCY + Math.sin(angle)*VR*0.95;
-        const g = vx.createRadialGradient(gx,gy,0, gx,gy, glowR*0.7);
-        g.addColorStop(0, `hsla(${hue%360},100%,65%,${glowAlpha*0.45})`);
-        g.addColorStop(0.4,`hsla(${hue%360},100%,55%,${glowAlpha*0.15})`);
-        g.addColorStop(1, `hsla(${hue%360},100%,45%,0)`);
-        vx.beginPath(); vx.arc(gx,gy,glowR*0.7,0,Math.PI*2);
-        vx.fillStyle=g; vx.fill();
+        const a=(s/segs)*Math.PI*2;
+        const hh=(s/segs)*360+vHue;
+        const gx=VCX+Math.cos(a)*VR, gy=VCY+Math.sin(a)*VR;
+        const g=vx.createRadialGradient(gx,gy,0,gx,gy,VR*(hovV?1.1:0.75)*pulse);
+        g.addColorStop(0,`hsla(${hh%360},100%,65%,${glowAlpha*(hovV?0.55:0.35)}`+')');
+        g.addColorStop(0.5,`hsla(${hh%360},100%,55%,${glowAlpha*0.15})`);
+        g.addColorStop(1,`hsla(${hh%360},100%,45%,0)`);
+        vx.beginPath();vx.arc(gx,gy,VR*(hovV?1.1:0.75)*pulse,0,Math.PI*2);
+        vx.fillStyle=g;vx.fill();
       }
     }
 
     // ── DARK RECORD — clipped ──
     vx.save();
     vx.beginPath(); vx.arc(VCX,VCY,VR,0,Math.PI*2); vx.clip();
-    vx.fillStyle='#06080e'; vx.fillRect(0,0,VSZ,VSZ);
+    vx.fillStyle='#07090f'; vx.fillRect(0,0,VSZ,VSZ);
 
-    // groove rings
-    for(let g=1;g<=9;g++){
-      vx.beginPath(); vx.arc(VCX,VCY,VR*(0.2+g*0.085),0,Math.PI*2);
-      vx.strokeStyle='rgba(255,255,255,0.03)'; vx.lineWidth=1; vx.stroke();
+    // rotating rainbow ring overlay
+    if(glowAlpha > 0.01){
+      const segs=48, alpha=(hovV?0.55:0.3)*glowAlpha;
+      for(let s=0;s<segs;s++){
+        const a1=(s/segs)*Math.PI*2+vHue*0.018;
+        const a2=((s+1)/segs)*Math.PI*2+vHue*0.018;
+        const hh=(s/segs)*360+vHue;
+        vx.beginPath();
+        vx.arc(VCX,VCY,VR*0.92,a1,a2);
+        vx.arc(VCX,VCY,VR*0.55,a2,a1,true);
+        vx.closePath();
+        vx.fillStyle=`hsla(${hh%360},100%,55%,${alpha})`;
+        vx.fill();
+      }
     }
 
-    // center label
-    vx.beginPath(); vx.arc(VCX,VCY,VR*0.24,0,Math.PI*2);
-    vx.fillStyle='#0a0c14'; vx.fill();
+    // groove rings on top
+    for(let g=1;g<=8;g++){
+      vx.beginPath(); vx.arc(VCX,VCY,VR*(0.22+g*0.09),0,Math.PI*2);
+      vx.strokeStyle='rgba(0,0,0,0.5)'; vx.lineWidth=1.5; vx.stroke();
+    }
+
+    // dark center
+    vx.beginPath(); vx.arc(VCX,VCY,VR*0.26,0,Math.PI*2);
+    vx.fillStyle='#07090f'; vx.fill();
 
     // hole
     vx.beginPath(); vx.arc(VCX,VCY,4,0,Math.PI*2);
     vx.fillStyle='#04050a'; vx.fill();
-    vx.strokeStyle='rgba(255,255,255,0.18)'; vx.lineWidth=1; vx.stroke();
+    vx.strokeStyle='rgba(255,255,255,0.2)'; vx.lineWidth=1; vx.stroke();
     vx.restore();
 
     requestAnimationFrame(drawVinyl);
